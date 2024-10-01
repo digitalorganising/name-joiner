@@ -1,6 +1,6 @@
 "use client";
 
-import Papa, { ParseResult } from "papaparse";
+import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { TrashIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
@@ -15,22 +15,27 @@ import {
   SelectContent,
 } from "@/components/ui/select";
 
+export type LoadedCSV = {
+  data: any[];
+  fields: string[];
+  nameField?: string;
+};
+
 type Props = {
   id: string;
   label: string;
+  csv?: LoadedCSV;
+  onLoaded: (csv?: LoadedCSV) => void;
 };
 
 type State = "initial" | "loading" | "success" | "error";
 
-export default function FileLoader({ id, label }: Props) {
+export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>("initial");
-  const [result, setResult] = useState<ParseResult<unknown> | undefined>(
-    undefined
-  );
-  const [nameCol, setNameCol] = useState<string | undefined>(undefined);
 
   const clear = () => {
+    onLoaded(undefined);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -48,12 +53,14 @@ export default function FileLoader({ id, label }: Props) {
           setState("error");
         },
         complete: (result) => {
-          setResult(result);
-          setNameCol(
-            result.meta.fields!.find((field) =>
+          onLoaded({
+            data: result.data,
+            fields: result.meta.fields!,
+            nameField: result.meta.fields!.find((field) =>
               field.toLowerCase().includes("name")
-            )
-          );
+            ),
+          });
+
           setState("success");
         },
       });
@@ -81,18 +88,21 @@ export default function FileLoader({ id, label }: Props) {
           </Button>
         </div>
         {state === "loading" ? "Loading..." : null}
-        {state === "success" && result ? (
+        {state === "success" && csv ? (
           <>
             <div className="italic text-sm mt-5 mb-3">
-              Loaded <em className="font-bold">{result.data.length}</em> rows
+              Loaded <em className="font-bold">{csv.data.length}</em> rows
             </div>
             <Label htmlFor={`${id}-name-col`}>Column for name</Label>
-            <Select value={nameCol} onValueChange={setNameCol}>
+            <Select
+              value={csv.nameField}
+              onValueChange={(nameField) => onLoaded({ ...csv, nameField })}
+            >
               <SelectTrigger id={`${id}-name-col`}>
-                <SelectValue placeholder="FLOP" />
+                <SelectValue placeholder="Select a column for the name" />
               </SelectTrigger>
               <SelectContent>
-                {result.meta.fields!.map((field) => (
+                {csv.fields!.map((field) => (
                   <SelectItem value={field} key={field}>
                     {field}
                   </SelectItem>
