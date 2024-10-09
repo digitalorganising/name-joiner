@@ -2,7 +2,7 @@
 
 import Papa from "papaparse";
 import { useRef, useState } from "react";
-import { TrashIcon } from "@radix-ui/react-icons";
+import { Cross2Icon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,23 +14,50 @@ import {
   SelectValue,
   SelectContent,
 } from "@/components/ui/select";
+import { CSVRow, LoadedCSV } from "@/lib/types";
 
-export type LoadedCSV = {
-  data: any[];
-  fields: string[];
-  nameField?: string;
+const emailRegex = new RegExp("^[^@]+@[^@]+.[^@]+$");
+
+const findNameField = <Field extends string>(fields: Field[]): Field =>
+  fields.find((field) => field.toLowerCase().includes("name")) ?? fields[0];
+
+const findEmailField = <Field extends string>(
+  fields: Field[],
+  row: CSVRow<Field>
+): Field | undefined => {
+  const maybeEmailField = fields.find((f) => {
+    const lc = f.toLowerCase();
+    return lc === "email" || lc === "mail";
+  });
+  return (
+    maybeEmailField ??
+    (Object.values(row).find(
+      (value) => typeof value === "string" && emailRegex.test(value)
+    ) as Field | undefined)
+  );
 };
 
-type Props = {
+const findIdField = <Field extends string>(
+  fields: Field[],
+  row: CSVRow<Field>
+): Field =>
+  fields.find((f) => f === "id") ?? findEmailField(fields, row) ?? fields[0];
+
+type Props<Field extends string> = {
   id: string;
   label: string;
-  csv?: LoadedCSV;
-  onLoaded: (csv?: LoadedCSV) => void;
+  csv?: LoadedCSV<Field>;
+  onLoaded: (csv?: LoadedCSV<Field>) => void;
 };
 
 type State = "initial" | "loading" | "success" | "error";
 
-export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
+export default function CSVLoader<Field extends string>({
+  id,
+  label,
+  csv,
+  onLoaded,
+}: Props<Field>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>("initial");
 
@@ -46,19 +73,21 @@ export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
     const file = e.target.files?.[0];
     if (file) {
       setState("loading");
-      Papa.parse(file, {
+      Papa.parse<CSVRow<Field>>(file, {
         header: true,
+        skipEmptyLines: true,
         error: (e) => {
           console.error(e);
           setState("error");
         },
         complete: (result) => {
+          const fields = result.meta.fields as Field[];
           onLoaded({
             data: result.data,
-            fields: result.meta.fields!,
-            nameField: result.meta.fields!.find((field) =>
-              field.toLowerCase().includes("name")
-            ),
+            fields,
+            idField: findIdField(fields, result.data[0]),
+            nameField: findNameField(fields as Field[]),
+            emailField: findEmailField(fields, result.data[0]),
           });
 
           setState("success");
@@ -68,7 +97,7 @@ export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
   };
 
   return (
-    <Card>
+    <Card className="grow">
       <CardHeader>
         <Label className="font-bold text-lg" htmlFor={id}>
           {label}
@@ -83,8 +112,13 @@ export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
             onChange={handleFile}
             ref={inputRef}
           />
-          <Button variant="outline" size="icon" onClick={clear}>
-            <TrashIcon />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={clear}
+            title="Clear file selection"
+          >
+            <Cross2Icon />
           </Button>
         </div>
         {state === "loading" ? "Loading..." : null}
@@ -96,7 +130,9 @@ export default function CSVLoader({ id, label, csv, onLoaded }: Props) {
             <Label htmlFor={`${id}-name-col`}>Column for name</Label>
             <Select
               value={csv.nameField}
-              onValueChange={(nameField) => onLoaded({ ...csv, nameField })}
+              onValueChange={(nameField) =>
+                onLoaded({ ...csv, nameField: nameField as Field })
+              }
             >
               <SelectTrigger id={`${id}-name-col`}>
                 <SelectValue placeholder="Select a column for the name" />
