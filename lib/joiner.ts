@@ -14,7 +14,7 @@ const isUnambiguous = (result: SearchResult): boolean => {
   );
 };
 
-type Match<Id> = {
+export type Match<Id> = {
   id: Id;
   name: string;
 };
@@ -50,11 +50,11 @@ export type MatchedRow<DataFields extends string, Id extends string = string> =
   | PotentialMatchedRow<DataFields, Id>
   | UnmatchedRow<DataFields>;
 
-type MatchResult<
+export type MatchResult<
   PrimaryFields extends string,
   SecondaryFields extends string
 > = {
-  matches: MatchedRow<SecondaryFields, PrimaryFields>[];
+  matches: Map<SecondaryFields, MatchedRow<SecondaryFields, PrimaryFields>>;
   search: (query: string) => Match<PrimaryFields>[];
 };
 
@@ -110,33 +110,49 @@ export const matchSubset = <
     name: r[primary.nameField],
   });
 
-  const matches = secondary.data.map((row) => {
-    const name = row[secondary.nameField]!.toString();
-    const email = secondary.emailField && row[secondary.emailField]?.toString();
-    const searchResults = primaryMiniSearch.search(createQuery(name, email));
+  const matches = new Map<
+    SecondaryFields,
+    MatchedRow<SecondaryFields, PrimaryFields>
+  >(
+    secondary.data.map((row) => {
+      const id = row[secondary.idField] as SecondaryFields;
+      const name = row[secondary.nameField]!.toString();
+      const email =
+        secondary.emailField && row[secondary.emailField]?.toString();
+      const searchResults = primaryMiniSearch.search(createQuery(name, email));
 
-    if (searchResults.length === 0) {
-      return {
-        matchLevel: "no-match" as const,
-        data: row,
-        name,
-      };
-    } else if (isUnambiguous(searchResults[0])) {
-      return {
-        matchLevel: "unambiguous" as const,
-        data: row,
-        name,
-        match: toMatch(searchResults[0]),
-      };
-    } else {
-      return {
-        matchLevel: "potential-match" as const,
-        data: row,
-        name,
-        potentialMatches: searchResults.map(toMatch),
-      };
-    }
-  });
+      if (searchResults.length === 0) {
+        return [
+          id,
+          {
+            matchLevel: "no-match" as const,
+            data: row,
+            name,
+          },
+        ];
+      } else if (isUnambiguous(searchResults[0])) {
+        return [
+          id,
+          {
+            matchLevel: "unambiguous" as const,
+            data: row,
+            name,
+            match: toMatch(searchResults[0]),
+          },
+        ];
+      } else {
+        return [
+          id,
+          {
+            matchLevel: "potential-match" as const,
+            data: row,
+            name,
+            potentialMatches: searchResults.map(toMatch),
+          },
+        ];
+      }
+    })
+  );
 
   return {
     search: (query) =>

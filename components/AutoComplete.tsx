@@ -20,7 +20,7 @@ import { useState } from "react";
 type Props<T> = {
   value?: T;
   placeholder: string;
-  handleSelect: (id: string) => void;
+  handleSelect: (value?: T) => void;
   prefilled: T[];
   handleSearch: (query: string) => T[];
   renderItem: (item: T) => React.ReactNode;
@@ -53,9 +53,9 @@ export default function AutoComplete<T>({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-3/4 justify-between"
         >
-          {value ?? prefilled[0] ? renderItem(prefilled[0]) : placeholder}
+          {value ? renderItem(value) : placeholder}
           <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -68,14 +68,19 @@ export default function AutoComplete<T>({
             className="h-9"
           />
           <CommandList>
-            <CommandEmpty>No entries found.</CommandEmpty>
+            <CommandEmpty>No matches.</CommandEmpty>
             <CommandGroup>
               {options.map((item) => (
                 <CommandItem
                   key={getItemId(item)}
                   value={getItemId(item)}
-                  onSelect={(currentValue) => {
-                    handleSelect(currentValue === value ? "" : currentValue);
+                  onSelect={(id) => {
+                    if (value && id === getItemId(value)) {
+                      handleSelect(undefined);
+                    } else {
+                      const rs = options.find((o) => id === getItemId(o));
+                      handleSelect(rs);
+                    }
                     setOpen(false);
                   }}
                 >

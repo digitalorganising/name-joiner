@@ -30,6 +30,7 @@ type Props<
   DataFields extends string,
   Id extends string
 > = {
+  idField: keyof T["data"];
   columns: ColumnDef<T>[];
   rows: T[];
   className?: string;
@@ -40,9 +41,16 @@ export default function MembershipTable<
   T extends MatchedRow<DataFields, Id>,
   DataFields extends string,
   Id extends string
->({ rows, columns, pageSize = 50, className }: Props<T, DataFields, Id>) {
+>({
+  rows,
+  idField,
+  columns,
+  pageSize = 50,
+  className,
+}: Props<T, DataFields, Id>) {
   const table = useReactTable<T>({
     data: rows,
+    getRowId: (row) => row.data[idField] as string,
     columns: columns.map((colDef) => ({
       ...colDef,
       header: (context) => (
