@@ -1,6 +1,5 @@
 "use client";
 
-import { TrashIcon } from "@radix-ui/react-icons";
 import {
   Table,
   TableBody,
@@ -15,22 +14,19 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  StringOrTemplateHeader,
   useReactTable,
 } from "@tanstack/react-table";
-import { Card } from "./ui/card";
 import { DataTablePagination } from "./DataTablePagination";
 import { DataTableColumnHeader } from "./DataTableColumnHeader";
 import { DataTableViewOptions } from "./DataTableViewOptions";
-import { MatchedRow } from "@/lib/joiner";
 import { cn } from "@/lib/utils";
+import { MatchedRow } from "@/lib/merging";
 
 type Props<
-  T extends MatchedRow<DataFields, Id>,
+  T extends MatchedRow<DataFields, ForeignId>,
   DataFields extends string,
-  Id extends string
+  ForeignId extends string
 > = {
-  idField: keyof T["data"];
   columns: ColumnDef<T>[];
   rows: T[];
   className?: string;
@@ -38,19 +34,13 @@ type Props<
 };
 
 export default function MembershipTable<
-  T extends MatchedRow<DataFields, Id>,
-  DataFields extends string,
-  Id extends string
->({
-  rows,
-  idField,
-  columns,
-  pageSize = 50,
-  className,
-}: Props<T, DataFields, Id>) {
+  T extends MatchedRow<DataField, ForeignId>,
+  DataField extends string,
+  ForeignId extends string
+>({ rows, columns, pageSize = 50, className }: Props<T, DataField, ForeignId>) {
   const table = useReactTable<T>({
     data: rows,
-    getRowId: (row) => row.data[idField] as string,
+    getRowId: (row) => row.id,
     columns: columns.map((colDef) => ({
       ...colDef,
       header: (context) => (
@@ -76,7 +66,7 @@ export default function MembershipTable<
 
   return (
     <div className={cn("border rounded-sm", className)}>
-      <Table>
+      <Table className="table-auto md:table-fixed">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>

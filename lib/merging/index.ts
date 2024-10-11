@@ -1,6 +1,7 @@
 import * as ASCIIFolding from "fold-to-ascii";
-import { LoadedCSV, CSVRow } from "./types";
 import MiniSearch, { Query, SearchResult } from "minisearch";
+import { LoadedCSV } from "../types";
+import { MatchedRow, MatchResult } from "./types";
 
 const normalizeName = (name: string): string => {
   const folded = ASCIIFolding.foldReplacing(name);
@@ -14,75 +15,31 @@ const isUnambiguous = (result: SearchResult): boolean => {
   );
 };
 
-export type Match<Id> = {
-  id: Id;
-  name: string;
-};
-
-export type UnambiguousMatchedRow<
-  DataFields extends string,
-  Id extends string = string
-> = {
-  matchLevel: "unambiguous";
-  data: CSVRow<DataFields>;
-  name: string;
-  match: Match<Id>;
-};
-
-export type PotentialMatchedRow<
-  DataFields extends string,
-  Id extends string = string
-> = {
-  matchLevel: "potential-match";
-  data: CSVRow<DataFields>;
-  name: string;
-  potentialMatches: Match<Id>[];
-};
-
-export type UnmatchedRow<DataFields extends string> = {
-  matchLevel: "no-match";
-  data: CSVRow<DataFields>;
-  name: string;
-};
-
-export type MatchedRow<DataFields extends string, Id extends string = string> =
-  | UnambiguousMatchedRow<DataFields, Id>
-  | PotentialMatchedRow<DataFields, Id>
-  | UnmatchedRow<DataFields>;
-
-export type MatchResult<
-  PrimaryFields extends string,
-  SecondaryFields extends string
-> = {
-  matches: Map<SecondaryFields, MatchedRow<SecondaryFields, PrimaryFields>>;
-  search: (query: string) => Match<PrimaryFields>[];
-};
-
 export const matchSubset = <
-  PrimaryFields extends string,
-  SecondaryFields extends string
+  SupersetField extends string,
+  SubsetField extends string
 >(
-  primary: LoadedCSV<PrimaryFields>,
-  secondary: LoadedCSV<SecondaryFields>
-): MatchResult<PrimaryFields, SecondaryFields> => {
-  const queryFields = [primary.nameField, primary.emailField].filter(
-    (f): f is PrimaryFields => f !== undefined
+  superset: LoadedCSV<SupersetField>,
+  subset: LoadedCSV<SubsetField>
+): MatchResult<SubsetField, SupersetField> => {
+  const queryFields = [superset.nameField, superset.emailField].filter(
+    (f): f is SupersetField => f !== undefined
   );
   const primaryMiniSearch = new MiniSearch({
     fields: queryFields,
     storeFields: queryFields,
-    idField: primary.idField,
+    idField: superset.idField,
     tokenize: (text, fieldName) => text.split(" "),
     processTerm: (term, fieldName) =>
-      fieldName === primary.nameField
+      fieldName === superset.nameField
         ? normalizeName(term)
         : term.toLowerCase(),
   });
-  const cleanedPrimaryData = primary.data.filter((d) => !!d[primary.idField]);
-  if (cleanedPrimaryData.length !== primary.data.length) {
+  const cleanedPrimaryData = superset.data.filter((d) => !!d[superset.idField]);
+  if (cleanedPrimaryData.length !== superset.data.length) {
     console.log(
       `Removed ${
-        primary.data.length - cleanedPrimaryData.length
+        superset.data.length - cleanedPrimaryData.length
       } rows from the index which did not have an ID`
     );
   }
@@ -92,13 +49,13 @@ export const matchSubset = <
     combineWith: "OR",
     queries: [
       {
-        fields: [primary.nameField],
+        fields: [superset.nameField],
         fuzzy: 0.2,
         queries: [name],
       } as Query,
-      email && primary.emailField
+      email && superset.emailField
         ? {
-            fields: [primary.emailField],
+            fields: [superset.emailField],
             queries: [email],
           }
         : undefined,
@@ -106,19 +63,16 @@ export const matchSubset = <
   });
 
   const toMatch = (r: SearchResult) => ({
-    id: r.id as PrimaryFields,
-    name: r[primary.nameField],
+    id: r.id as SupersetField,
+    name: r[superset.nameField],
   });
 
-  const matches = new Map<
-    SecondaryFields,
-    MatchedRow<SecondaryFields, PrimaryFields>
-  >(
-    secondary.data.map((row) => {
-      const id = row[secondary.idField] as SecondaryFields;
-      const name = row[secondary.nameField]!.toString();
+  const matches = new Map<SubsetField, MatchedRow<SubsetField, SupersetField>>(
+    subset.data.map((row) => {
+      const id = row[subset.idField] as SubsetField;
+      const name = row[subset.nameField]!.toString();
       const email =
-        secondary.emailField && row[secondary.emailField]?.toString();
+        subset.emailField && row[subset.emailField]?.toString();
       const searchResults = primaryMiniSearch.search(createQuery(name, email));
 
       if (searchResults.length === 0) {
@@ -127,6 +81,7 @@ export const matchSubset = <
           {
             matchLevel: "no-match" as const,
             data: row,
+            id,
             name,
           },
         ];
@@ -137,6 +92,7 @@ export const matchSubset = <
             matchLevel: "unambiguous" as const,
             data: row,
             name,
+            id,
             match: toMatch(searchResults[0]),
           },
         ];
@@ -147,6 +103,7 @@ export const matchSubset = <
             matchLevel: "potential-match" as const,
             data: row,
             name,
+            id,
             potentialMatches: searchResults.map(toMatch),
           },
         ];
@@ -160,3 +117,5 @@ export const matchSubset = <
     matches,
   };
 };
+
+export * from "./types";

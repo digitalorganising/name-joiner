@@ -9,7 +9,13 @@ import {
 
 import CSVLoader from "../components/CSVLoader";
 import { Flavor, LoadedCSV, ValueOf } from "@/lib/types";
-import { MatchResult, Match, matchSubset } from "@/lib/joiner";
+import {
+  MatchResult,
+  Match,
+  matchSubset,
+  MatchedRow,
+  MatchLevel,
+} from "@/lib/merging";
 import {
   Card,
   CardContent,
@@ -21,6 +27,8 @@ import { Button } from "./ui/button";
 import MembershipTable from "./MembershipTable";
 import { groupBy } from "@/lib/utils";
 import AutoComplete from "./AutoComplete";
+import { CellContext } from "@tanstack/react-table";
+import { rowStateMachine } from "@/lib/merging/state-machine";
 
 type StaffListField = Flavor<string, "StaffList">;
 type MembershipListField = Flavor<string, "MembershipList">;
@@ -33,11 +41,13 @@ export default function NameJoiner() {
     LoadedCSV<MembershipListField> | undefined
   >(undefined);
   const [merge, setMerge] = useState<
-    MatchResult<StaffListField, MembershipListField> | undefined
+    MatchResult<MembershipListField, StaffListField> | undefined
   >(undefined);
   const [rowState, setRowState] = useState<
     Record<MembershipListField, Match<StaffListField>>
   >({});
+
+  const transitionRowState = rowStateMachine(setMerge);
 
   useEffect(() => {
     if (staffCSV && membershipCSV) {
@@ -53,22 +63,36 @@ export default function NameJoiner() {
         (r) => r.matchLevel
       );
     }
-  }, [merge]);
+  }, [merge?.matches]);
 
   useEffect(() => {
     if (groupedMerge && membershipCSV?.idField) {
       setRowState((state) => ({
         ...state,
-        ...groupedMerge?.["potential-match"].reduce(
+        ...groupedMerge?.["potential-match"]?.reduce(
           (accState, m) => ({
             ...accState,
-            [m.data[membershipCSV.idField] as string]: m.potentialMatches[0],
+            [m.id]: m.potentialMatches[0],
           }),
           {}
         ),
       }));
     }
   }, [groupedMerge?.["potential-match"]]);
+
+  const handleMatchSelect =
+    <T, V>(props: CellContext<T, V>) =>
+    (value?: (typeof rowState)[MembershipListField]) =>
+      setRowState((state) => {
+        if (value) {
+          return { ...state, [props.row.id]: value };
+        } else if (props.row.id in state) {
+          delete state[props.row.id];
+          return state;
+        } else {
+          return state;
+        }
+      });
 
   return (
     <>
@@ -94,14 +118,13 @@ export default function NameJoiner() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {groupedMerge && membershipCSV && staffCSV ? (
+          {groupedMerge && merge && membershipCSV && staffCSV ? (
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-bold mb-2 pl-0.5">
                   Potential matches
                 </h3>
                 <MembershipTable
-                  idField={membershipCSV.idField}
                   className="border-amber-600 bg-amber-50"
                   rows={groupedMerge["potential-match"] ?? []}
                   columns={[
@@ -118,18 +141,7 @@ export default function NameJoiner() {
                           prefilled={props.row.original.potentialMatches}
                           handleSearch={merge.search}
                           value={rowState[props.row.id]}
-                          handleSelect={(value) =>
-                            setRowState((state) => {
-                              if (value) {
-                                return { ...state, [props.row.id]: value };
-                              } else if (props.row.id in state) {
-                                delete state[props.row.id];
-                                return state;
-                              } else {
-                                return state;
-                              }
-                            })
-                          }
+                          handleSelect={handleMatchSelect(props)}
                           getItemId={({ id }) => id}
                           renderItem={({ name }) => name}
                         />
@@ -137,17 +149,34 @@ export default function NameJoiner() {
                     },
                     {
                       id: "action",
-                      header: "Action",
-                      cell: () => (
-                        <div className="space-x-2">
+                      header: () => null,
+                      cell: (props) => (
+                        <div className="space-x-2 flex justify-end">
                           <Button
                             title="Confirm match"
                             className="bg-emerald-700 hover:bg-emerald-700/50"
+                            onClick={() =>
+                              transitionRowState(
+                                props.row.original,
+                                rowState,
+                                "unambiguous"
+                              )
+                            }
                           >
                             <CheckCircledIcon className="mr-2 h-4 w-4" />{" "}
                             Confirm match
                           </Button>
-                          <Button title="Remove match" variant="destructive">
+                          <Button
+                            title="Remove"
+                            variant="destructive"
+                            onClick={() =>
+                              transitionRowState(
+                                props.row.original,
+                                rowState,
+                                "removed"
+                              )
+                            }
+                          >
                             <ExitIcon className="mr-2 h-4 w-4" /> Remove
                           </Button>
                         </div>
@@ -160,7 +189,6 @@ export default function NameJoiner() {
               <div>
                 <h3 className="text-sm font-bold mb-2 pl-0.5">No match</h3>
                 <MembershipTable
-                  idField={membershipCSV.idField}
                   className="border-red-600 bg-red-50"
                   rows={groupedMerge["no-match"] ?? []}
                   columns={[
@@ -177,18 +205,7 @@ export default function NameJoiner() {
                           prefilled={[]}
                           handleSearch={merge.search}
                           value={rowState[props.row.id]}
-                          handleSelect={(value) =>
-                            setRowState((state) => {
-                              if (value) {
-                                return { ...state, [props.row.id]: value };
-                              } else if (props.row.id in state) {
-                                delete state[props.row.id];
-                                return state;
-                              } else {
-                                return state;
-                              }
-                            })
-                          }
+                          handleSelect={handleMatchSelect(props)}
                           getItemId={({ id }) => id}
                           renderItem={({ name }) => name}
                         />
@@ -196,11 +213,39 @@ export default function NameJoiner() {
                     },
                     {
                       id: "action",
-                      header: "Action",
-                      cell: () => (
-                        <Button title="Confirm no match" variant="destructive">
-                          <ExitIcon className="mr-2 h-4 w-4" /> Confirm no match
-                        </Button>
+                      header: () => null,
+                      cell: (props) => (
+                        <div className="space-x-2 flex justify-end">
+                          {rowState[props.row.id] ? (
+                            <Button
+                              title="Confirm match"
+                              className="bg-emerald-700 hover:bg-emerald-700/50"
+                              onClick={() =>
+                                transitionRowState(
+                                  props.row.original,
+                                  rowState,
+                                  "unambiguous"
+                                )
+                              }
+                            >
+                              <CheckCircledIcon className="mr-2 h-4 w-4" />{" "}
+                              Confirm match
+                            </Button>
+                          ) : null}
+                          <Button
+                            title="Remove"
+                            variant="destructive"
+                            onClick={() =>
+                              transitionRowState(
+                                props.row.original,
+                                rowState,
+                                "removed"
+                              )
+                            }
+                          >
+                            <ExitIcon className="mr-2 h-4 w-4" /> Remove
+                          </Button>
+                        </div>
                       ),
                     },
                   ]}
@@ -210,7 +255,6 @@ export default function NameJoiner() {
               <div>
                 <h3 className="text-sm font-bold mb-2 pl-0.5">Matches</h3>
                 <MembershipTable
-                  idField={membershipCSV.idField}
                   className="border-green-600 bg-green-50"
                   rows={groupedMerge.unambiguous ?? []}
                   columns={[
@@ -226,23 +270,36 @@ export default function NameJoiner() {
                     },
                     {
                       id: "action",
-                      header: "Action",
-                      cell: () => (
-                        <div className="space-x-2">
+                      header: () => null,
+                      cell: (props) => (
+                        <div className="space-x-2 flex justify-end">
                           <Button
                             variant="outline"
-                            size="icon"
-                            title="Question match validity"
+                            title="Incorrect match"
                             className="border-primary"
+                            onClick={() =>
+                              transitionRowState(
+                                props.row.original,
+                                rowState,
+                                "potential-match"
+                              )
+                            }
                           >
-                            <QuestionMarkIcon />
+                            <QuestionMarkIcon className="mr-2 h-4 w-4" />{" "}
+                            Incorrect match
                           </Button>
                           <Button
-                            title="Remove match"
+                            title="Remove"
                             variant="destructive"
-                            size="icon"
+                            onClick={() =>
+                              transitionRowState(
+                                props.row.original,
+                                rowState,
+                                "removed"
+                              )
+                            }
                           >
-                            <ExitIcon />
+                            <ExitIcon className="mr-2 h-4 w-4" /> Remove
                           </Button>
                         </div>
                       ),
