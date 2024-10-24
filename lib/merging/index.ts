@@ -8,12 +8,25 @@ const normalizeName = (name: string): string => {
   return folded.toLowerCase();
 };
 
-const isUnambiguous = (result: SearchResult): boolean => {
-  return (
-    result.terms.length === result.queryTerms.length &&
-    result.queryTerms.every((term, i) => result.terms[i] === term)
-  );
-};
+const isUnambiguous = (resultName: string, name: string): boolean =>
+  normalizeName(resultName) === normalizeName(name);
+
+const edgeNGrammer =
+  (min: number, max: number) =>
+  (term: string): string[] => {
+    const tokens: string[] = [term];
+    for (let i = min; i <= max; i++) {
+      const token = term.slice(0, i);
+      if (token === term) {
+        break;
+      }
+      tokens.push(token);
+    }
+    return tokens;
+  };
+
+const namePrefixNGrammer = edgeNGrammer(3, 5);
+const nameAnalyzer = (term: string) => namePrefixNGrammer(normalizeName(term));
 
 export const matchSubset = <
   SupersetField extends string,
@@ -32,7 +45,7 @@ export const matchSubset = <
     tokenize: (text, fieldName) => text.split(" "),
     processTerm: (term, fieldName) =>
       fieldName === superset.nameField
-        ? normalizeName(term)
+        ? nameAnalyzer(term)
         : term.toLowerCase(),
   });
   const cleanedPrimaryData = superset.data.filter((d) => !!d[superset.idField]);
@@ -50,8 +63,9 @@ export const matchSubset = <
     queries: [
       {
         fields: [superset.nameField],
-        fuzzy: 0.2,
+        fuzzy: (term) => (term.length > 3 ? 0.2 : null),
         queries: [name],
+        processTerm: nameAnalyzer,
       } as Query,
       email && superset.emailField
         ? {
@@ -68,12 +82,13 @@ export const matchSubset = <
   });
 
   const matches = new Map<SubsetField, MatchedRow<SubsetField, SupersetField>>(
-    subset.data.map((row) => {
+    subset.data.map((row, i) => {
       const id = row[subset.idField] as SubsetField;
       const name = row[subset.nameField]!.toString();
-      const email =
-        subset.emailField && row[subset.emailField]?.toString();
-      const searchResults = primaryMiniSearch.search(createQuery(name, email));
+      const email = subset.emailField && row[subset.emailField]?.toString();
+      const searchResults = primaryMiniSearch
+        .search(createQuery(name, email))
+        .slice(0, 10);
 
       if (searchResults.length === 0) {
         return [
@@ -85,7 +100,7 @@ export const matchSubset = <
             name,
           },
         ];
-      } else if (isUnambiguous(searchResults[0])) {
+      } else if (isUnambiguous(searchResults[0].displayName, name)) {
         return [
           id,
           {

@@ -115,12 +115,13 @@ export default function NameJoiner() {
         <CardContent>
           {groupedMerge && merge && membershipCSV && staffCSV ? (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-bold mb-2 pl-0.5">
-                  Potential matches
-                </h3>
-                {groupedMerge["potential-match"] &&
-                groupedMerge["potential-match"].length !== 0 ? (
+              {groupedMerge["potential-match"] &&
+              groupedMerge["potential-match"].length !== 0 ? (
+                <div>
+                  <h3 className="text-sm font-bold mb-2 pl-0.5">
+                    Potential matches
+                  </h3>
+
                   <MembershipTable
                     className="border-amber-600 bg-amber-50"
                     rows={groupedMerge["potential-match"]}
@@ -181,17 +182,12 @@ export default function NameJoiner() {
                       },
                     ]}
                   />
-                ) : (
-                  <span className="pl-0.5 text-sm text-muted-foreground">
-                    Any potential matches have been resolved.
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-sm font-bold mb-2 pl-0.5">No match</h3>
-                {groupedMerge["no-match"] &&
-                groupedMerge["no-match"].length !== 0 ? (
+                </div>
+              ) : null}
+              {groupedMerge["no-match"] &&
+              groupedMerge["no-match"].length !== 0 ? (
+                <div>
+                  <h3 className="text-sm font-bold mb-2 pl-0.5">No match</h3>
                   <MembershipTable
                     className="border-red-600 bg-red-50"
                     rows={groupedMerge["no-match"] ?? []}
@@ -254,12 +250,9 @@ export default function NameJoiner() {
                       },
                     ]}
                   />
-                ) : (
-                  <span className="pl-0.5 text-sm text-muted-foreground">
-                    Any non-matching entries have been resolved.
-                  </span>
-                )}
-              </div>
+                  )
+                </div>
+              ) : null}
 
               {groupedMerge.removed && groupedMerge.removed.length !== 0 ? (
                 <div>
@@ -299,11 +292,11 @@ export default function NameJoiner() {
                   />
                 </div>
               ) : null}
+              {groupedMerge.unambiguous &&
+              groupedMerge.unambiguous.length !== 0 ? (
+                <div>
+                  <h3 className="text-sm font-bold mb-2 pl-0.5">Matches</h3>
 
-              <div>
-                <h3 className="text-sm font-bold mb-2 pl-0.5">Matches</h3>
-                {groupedMerge.unambiguous &&
-                groupedMerge.unambiguous.length !== 0 ? (
                   <MembershipTable
                     className="border-green-600 bg-green-50"
                     rows={groupedMerge.unambiguous}
@@ -356,12 +349,8 @@ export default function NameJoiner() {
                       },
                     ]}
                   />
-                ) : (
-                  <span className="pl-0.5 text-sm text-muted-foreground">
-                    There are no confirmed matches.
-                  </span>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardContent>

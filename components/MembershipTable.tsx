@@ -18,7 +18,6 @@ import {
 } from "@tanstack/react-table";
 import { DataTablePagination } from "./DataTablePagination";
 import { DataTableColumnHeader } from "./DataTableColumnHeader";
-import { DataTableViewOptions } from "./DataTableViewOptions";
 import { cn } from "@/lib/utils";
 import { MatchedRow } from "@/lib/merging";
 
@@ -37,7 +36,7 @@ export default function MembershipTable<
   T extends MatchedRow<DataField, ForeignId>,
   DataField extends string,
   ForeignId extends string
->({ rows, columns, pageSize = 50, className }: Props<T, DataField, ForeignId>) {
+>({ rows, columns, pageSize = 25, className }: Props<T, DataField, ForeignId>) {
   const table = useReactTable<T>({
     data: rows,
     getRowId: (row) => row.id,
@@ -100,6 +99,11 @@ export default function MembershipTable<
           ))}
         </TableBody>
       </Table>
+      {table.getPageCount() > 1 ? (
+        <div className="my-2 pr-2">
+          <DataTablePagination table={table} />
+        </div>
+      ) : null}
     </div>
   );
 }
