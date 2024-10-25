@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { DownloadIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { useMemo, useState } from "react";
+import {
+  DownloadIcon,
+  ExclamationTriangleIcon,
+  FileMinusIcon,
+} from "@radix-ui/react-icons";
 import {
   Card,
   CardContent,
@@ -28,10 +32,33 @@ export default function MergeCards<
     () => matchSubset(superset, subset)
   );
 
-  const incomplete =
-    merge.matches.filter(
-      (m) => m.matchLevel === "potential-match" || m.matchLevel === "no-match"
-    ).length !== 0;
+  const mergeState = useMemo(
+    () =>
+      merge.matches.reduce(
+        (totals, m) => {
+          if (
+            m.matchLevel === "potential-match" ||
+            m.matchLevel === "no-match"
+          ) {
+            return {
+              ...totals,
+              incomplete: totals.incomplete + 1,
+            };
+          } else if (m.matchLevel === "removed") {
+            return {
+              ...totals,
+              removed: totals.removed + 1,
+            };
+          }
+          return totals;
+        },
+        {
+          incomplete: 0,
+          removed: 0,
+        }
+      ),
+    [merge.matches]
+  );
 
   const exportMatched = () => {
     const invertedMatches = new Map(
@@ -75,7 +102,7 @@ export default function MergeCards<
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {incomplete ? (
+          {mergeState.incomplete > 0 ? (
             <Alert>
               <ExclamationTriangleIcon />
               <AlertTitle>Unresolved entries</AlertTitle>
@@ -90,6 +117,24 @@ export default function MergeCards<
               Export merged lists
             </Button>
           )}
+          {mergeState.removed > 0 ? (
+            <Button
+              onClick={() =>
+                saveCSV(
+                  "removed-members.csv",
+                  merge.matches.flatMap((m) =>
+                    m.matchLevel === "removed" ? [m.data] : []
+                  )
+                )
+              }
+              title="Export removed members"
+              variant="outline"
+              className="my-2"
+            >
+              <FileMinusIcon />
+              Export removed members list
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </>
