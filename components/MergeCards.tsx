@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ArchiveIcon,
   DownloadIcon,
   ExclamationTriangleIcon,
   FileMinusIcon,
@@ -16,8 +17,9 @@ import { LoadedCSV } from "@/lib/types";
 import JoiningTables from "./JoiningTables";
 import { MatchResult, matchSubset } from "@/lib/merging";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
-import { saveCSV } from "@/lib/csv";
+import { saveCSV } from "@/lib/io";
 import { mergeNamespaced } from "@/lib/utils";
+import SaveProgressDialog from "./SaveProgressDialog";
 
 type Props<SupersetField extends string, SubsetField extends string> = {
   superset: LoadedCSV<SupersetField>;
@@ -83,13 +85,22 @@ export default function MergeCards<
 
   return (
     <>
-      <Card className="my-4 sm:my-6">
+      <Card className="my-4 sm:my-6 relative">
         <CardHeader>
           <CardTitle>Matched Membership</CardTitle>
           <CardDescription>
             Membership list with potential matches from the staff list.
           </CardDescription>
         </CardHeader>
+        <SaveProgressDialog state={merge} hydrateState={setMerge}>
+          <Button
+            variant="outline"
+            title="Save/load progress"
+            className="absolute top-6 right-6 w-10 h-10"
+          >
+            <ArchiveIcon />
+          </Button>
+        </SaveProgressDialog>
         <CardContent>
           <JoiningTables merge={merge} setMerge={setMerge} />
         </CardContent>
