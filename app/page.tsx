@@ -1,4 +1,4 @@
-import NameJoiner from "../components/NameJoiner";
+import NameJoiner from "../components/MainInterface";
 
 export default function Home() {
   return (

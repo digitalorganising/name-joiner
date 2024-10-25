@@ -32,3 +32,19 @@ export function groupBy<K extends KeysOfType<T, string>, T>(
     return acc;
   }, {} as Return<T, K>);
 }
+
+export function mergeNamespaced(objs: Record<string, object>): object {
+  return Object.entries(objs).reduce(
+    (merged, [namespace, obj]) => ({
+      ...merged,
+      ...Object.entries(obj).reduce(
+        (prefixed, [originalKey, value]) => ({
+          ...prefixed,
+          [`${namespace}_${originalKey}`]: value,
+        }),
+        {}
+      ),
+    }),
+    {}
+  );
+}

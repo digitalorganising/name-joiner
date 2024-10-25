@@ -15,7 +15,3 @@ export type LoadedCSV<Field extends string> = {
   nameField: Field;
   emailField?: Field;
 };
-
-export type ValueOf<M extends Map<any, any>> = M extends Map<any, infer I>
-  ? I
-  : never;

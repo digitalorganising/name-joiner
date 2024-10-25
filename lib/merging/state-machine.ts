@@ -1,10 +1,13 @@
 import { Match, MatchedRow, MatchLevel, MatchResult } from "./types";
 
-export function rowStateMachine<Primary extends string, Foreign extends string>(
+export function mergeStateMachine<
+  Primary extends string,
+  Foreign extends string
+>(
   setMerge: (
     updater: (
-      state: MatchResult<Primary, Foreign> | undefined
-    ) => MatchResult<Primary, Foreign> | undefined
+      state: MatchResult<Primary, Foreign>
+    ) => MatchResult<Primary, Foreign>
   ) => void
 ) {
   return (
@@ -19,13 +22,10 @@ export function rowStateMachine<Primary extends string, Foreign extends string>(
       transitionTo: transitionTo,
     };
     const next = (f: MatchedRow<Primary, Foreign>) =>
-      setMerge(
-        (prev) =>
-          prev && {
-            ...prev,
-            matches: new Map(prev.matches).set(row.id, f),
-          }
-      );
+      setMerge((prev) => ({
+        ...prev,
+        matches: prev.matches.map((r) => (r.id === row.id ? f : r)),
+      }));
 
     if (row.matchLevel === "potential-match") {
       if (transitionTo === "removed") {

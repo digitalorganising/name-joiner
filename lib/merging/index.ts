@@ -81,50 +81,39 @@ export const matchSubset = <
     name: r[superset.nameField],
   });
 
-  const matches = new Map<SubsetField, MatchedRow<SubsetField, SupersetField>>(
-    subset.data.map((row, i) => {
-      const id = row[subset.idField] as SubsetField;
-      const name = row[subset.nameField]!.toString();
-      const email = subset.emailField && row[subset.emailField]?.toString();
-      const searchResults = primaryMiniSearch
-        .search(createQuery(name, email))
-        .slice(0, 10);
+  const matches = subset.data.map((row, i) => {
+    const id = row[subset.idField] as SubsetField;
+    const name = row[subset.nameField]!.toString();
+    const email = subset.emailField && row[subset.emailField]?.toString();
+    const searchResults = primaryMiniSearch
+      .search(createQuery(name, email))
+      .slice(0, 10);
 
-      if (searchResults.length === 0) {
-        return [
-          id,
-          {
-            matchLevel: "no-match" as const,
-            data: row,
-            id,
-            name,
-          },
-        ];
-      } else if (isUnambiguous(searchResults[0].displayName, name)) {
-        return [
-          id,
-          {
-            matchLevel: "unambiguous" as const,
-            data: row,
-            name,
-            id,
-            match: toMatch(searchResults[0]),
-          },
-        ];
-      } else {
-        return [
-          id,
-          {
-            matchLevel: "potential-match" as const,
-            data: row,
-            name,
-            id,
-            potentialMatches: searchResults.map(toMatch),
-          },
-        ];
-      }
-    })
-  );
+    if (searchResults.length === 0) {
+      return {
+        matchLevel: "no-match" as const,
+        data: row,
+        id,
+        name,
+      };
+    } else if (isUnambiguous(searchResults[0].displayName, name)) {
+      return {
+        matchLevel: "unambiguous" as const,
+        data: row,
+        name,
+        id,
+        match: toMatch(searchResults[0]),
+      };
+    } else {
+      return {
+        matchLevel: "potential-match" as const,
+        data: row,
+        name,
+        id,
+        potentialMatches: searchResults.map(toMatch),
+      };
+    }
+  });
 
   return {
     search: (query) =>

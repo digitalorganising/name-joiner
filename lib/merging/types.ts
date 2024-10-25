@@ -54,6 +54,6 @@ export type MatchResult<
   SubsetField extends string,
   SupersetField extends string
 > = {
-  matches: Map<SubsetField, MatchedRow<SubsetField, SupersetField>>;
+  matches: MatchedRow<SubsetField, SupersetField>[];
   search: (query: string) => Match<SupersetField>[];
 };
